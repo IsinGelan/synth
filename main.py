@@ -2,7 +2,7 @@
 from math import sin, tau
 
 from modules.helpers import int_to_interval
-from modules.sound_generator import Note, evolving_frequency, multiple_frequencies, note_str_to_freqs, note_to_freq, silence
+from modules.sound_generator import Note, evolving_frequency, jirj, multi_sine, note_str_to_freqs, note_to_freq, silence, triang
 from modules.track import MonoTrack, PolyTrack, iteration
 from modules.wav_rw import AudioData, read_wav_data, write_wav_data
 from modules.fun import display_amplitudes_img
@@ -33,12 +33,30 @@ def main2():
     chord_prog = MonoTrack()
     for i, chord in enumerate([I, V, iv, IV]):
         freqs = note_str_to_freqs(chord)
-        chord_track = MonoTrack.from_iter(multiple_frequencies(freqs, 2.5)).asdr(0.1, 0.7, 0.3, 0.5, hit_time=1.8)
+        chord_track = MonoTrack.from_iter(multi_sine(freqs, 2.5))
+        chord_track.adsr(0.1, 0.7, 0.3, 0.5, hit_time=1.8)
         chord_prog.add(MonoTrack.from_iter(silence(2.0 * i)).then(chord_track))
     chord_prog.mul(0.7)
 
     audio = AudioData.from_track(chord_prog)
     write_wav_data("chord.wav", audio)
+
+def main3():
+    # freqs = note_str_to_freqs("c e g")
+    # mono = MonoTrack.from_iter(jirj(freqs, 3.)).adsr(0.1, 0.7, 0.3, 0.7, hit_time=2.).mul(0.7)
+    mono = MonoTrack.from_iter(triang(note_to_freq(Note.C, 4), 4.0))
+    mono2 = MonoTrack.from_iter(triang(note_to_freq(Note.E, 4), 4.0))
+    audio = AudioData.from_track(mono.add(mono2).mul(0.3))
+    write_wav_data("jirj.wav", audio)
+
+def main_flute():
+    db = lambda decibels: 10**(decibels/10)
+    notes = note_str_to_freqs("dis3 dis6 dis5 ais6 g5 dis7 g6 fis6 c6 d7")
+    vols = [db(7), db(0), db(-6), db(-13), db(-16), db(-17), db(-23), db(-25), db(-26), db(-28)]
+    it = multi_sine(notes, 4.0, vols=vols)
+    mono = MonoTrack.from_iter(it).mul(0.9)
+
+    audio = AudioData.from_track(mono)
+    write_wav_data("flute_try.wav", audio)
     
-    
-main2()
+main_flute()

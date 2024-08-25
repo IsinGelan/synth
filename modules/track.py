@@ -189,7 +189,7 @@ class MonoTrack(Track):
         return cls.from_iter(it, sample_rate)
     
     # ==================
-    def asdr(self, a: float, d: float, s: float, r: float, *, hit_time: float) -> Self:
+    def adsr(self, a: float, d: float, s: float, r: float, *, hit_time: float) -> Self:
         def asdr_fun(t: float):
             if t < a:
                 return t/a

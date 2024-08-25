@@ -1,6 +1,7 @@
 
 """Only works for PCM ints"""
 
+from itertools import cycle
 from math import sin, tau
 from typing import Callable, Iterator
 from enum import IntEnum
@@ -55,7 +56,7 @@ def silence(dur_s: float) -> Iterator[float]:
         yield 0
 
 # @to_mono_track
-def one_frequency(f: float, dur_s: float, vol: float, *, phase: float = 0) -> Iterator[float]:
+def sine(f: float, dur_s: float, vol: float, *, phase: float = 0) -> Iterator[float]:
     assert 20 <= f <= 20000
 
     sample_n = int(SAMPLE_RATE * dur_s)
@@ -65,25 +66,33 @@ def one_frequency(f: float, dur_s: float, vol: float, *, phase: float = 0) -> It
         yield y
 
 # @to_mono_track
-def multiple_frequencies(fs: list[tuple[float]], dur_s: float, vol: float = 1, *, phases: list[float] = ...) -> Iterator[float]:
+
+
+def multi_sine(fs: list[float], dur_s: float, *, vols: list[float] = ..., phases: list[float] = ...) -> Iterator[float]:
     n = len(fs)
+    if vols == ...:
+        vols = [1]*n
     if phases == ...:
         phases = [0]*n
-    assert len(phases) == n
+    assert len(phases) == n and len(vols) == n
 
     sample_n = int(SAMPLE_RATE * dur_s)
+    dt = 1/SAMPLE_RATE
+
+    volsum = sum(vols)
+    
     for i in range(sample_n):
-        t = i/SAMPLE_RATE
-        y = vol/n * sum(sin(tau * freq * t + phase) for freq, phase in zip(fs, phases))
+        t = i*dt
+        y = 1/volsum * sum(vol * sin(tau * freq * t + phase) for freq, vol, phase in zip(fs, vols, phases))
         yield y
 
 # @to_mono_track
 def evolving_frequency(t_f_func: Callable[[float], float], dur_s: float, vol: float = 1) -> Iterator[float]:
     """f_func gives the frequency at each point"""
-    sample_n = SAMPLE_RATE * dur_s
-    phase = 0 # in range [0, 1)
-
+    sample_n = int(SAMPLE_RATE * dur_s)
     dt = 1/SAMPLE_RATE
+
+    phase = 0 # in range [0, 1)
 
     for i in range(sample_n):
         t = i*dt
@@ -92,3 +101,40 @@ def evolving_frequency(t_f_func: Callable[[float], float], dur_s: float, vol: fl
         phase %= 1
         y = vol*sin(tau*phase)
         yield y
+
+def jirj(fs: list[float], dur_s: float, *, vol: float = 1) -> Iterator[float]:
+    """switches between frequency `fs[0]`, then `fs[1]`, etc"""
+    sample_n = int(SAMPLE_RATE * dur_s)
+    dt = 1/SAMPLE_RATE
+
+    phase = 0  # in range [0, 1)
+    f_it = cycle(fs)
+    f = next(f_it)
+
+    for i in range(sample_n):
+        y = vol*sin(tau*phase)
+        phase += dt*f  # T = 1/f; dt/T
+        if phase >= 1:
+            f = next(f_it)
+            phase %= 1
+        yield y
+
+
+def triang(f: float, dur_s: float, vol: float = 1, *, phase: float = 0) -> Iterator[float]:
+    assert 20 <= f <= 20000
+    sample_n = int(SAMPLE_RATE * dur_s)
+    d_phase = f/SAMPLE_RATE
+
+    for i in range(sample_n):
+        y = 1 - abs(2 - abs(4*phase - 3))
+        phase += d_phase
+        phase %= 1
+        yield y
+
+
+def square(f: float, dur_s: float, vol: float = 1, *, phase: float = 0) -> Iterator[float]:
+    yield 0
+
+
+def sawtooth(f: float, dur_s: float, vol: float = 1, *, phase: float = 0) -> Iterator[float]:
+    yield 0
