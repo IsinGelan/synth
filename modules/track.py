@@ -1,8 +1,7 @@
 
 from abc import ABC
 from dataclasses import dataclass
-from itertools import zip_longest
-from typing import Callable, Iterable, Iterator, Self
+from typing import Callable, Iterator, Self
 
 from .helpers import clamp, int_to_interval, interval_to_int
 
@@ -137,6 +136,35 @@ class MultiplyFunction(IterationObject):
         self._time += self._dt
         ret = next(self.track) * factor
         return clamp(ret, -1, 1)
+    
+
+@dataclass
+class Dur(IterationObject):
+    track: Track
+    stop: float
+    start: float = 0
+    sample_rate: int = 48000
+    _stop_iteration = 0
+    _iteration = 0
+
+    # ==================
+    def __iter__(self):
+        iter(self.track)
+        self._stop_iteration = self.sample_rate * (self.stop - self.start)
+        for _ in range(self.sample_rate * self.start):
+            print("bana")
+            next(self.track)
+        return self
+
+    def __next__(self) -> float:
+        print("Bulwu")
+        if self._iteration >= self._stop_iteration:
+            print("Stop")
+            raise StopIteration("Duration over!")
+        ret = next(self.track)
+        print(ret)
+        self._iteration += 1
+        return clamp(ret, -1, 1)
 
 
 @dataclass
@@ -162,6 +190,7 @@ class FromList(IterationObject):
 
     def __next__(self) -> float:
         return next(self._iterator)
+    
 
 class MonoTrack(Track):
     def __init__(self, sample_rate: int = 48000):
@@ -218,11 +247,13 @@ class MonoTrack(Track):
         mtr = MonoTrack.from_iter(iterator, sample_rate)
         return self.then(mtr)
 
-    def add(self, other: Self) -> Self:
+    def add(self, other: Self, *, offset_t: float = 0) -> Self:
+        silence = (0 for _ in range(int(other.sample_rate * offset_t)))
+        obj = other if offset_t == 0 else MonoTrack.from_iter(silence).then(other)
         if self.obj.typus == "Addition":
-            self.obj.add(other)
+            self.obj.add(obj)
         else:
-            new_obj = Addition([self.obj, other])
+            new_obj = Addition([self.obj, obj])
             self.obj = new_obj
         return self
     
@@ -233,6 +264,20 @@ class MonoTrack(Track):
         else:
             self.obj = Multiply(self.obj, factor)
         return self
+    
+    # def dur(self, stop: float) -> Self:
+    #     """Edits the playtime (every arg in sec.)"""
+    #     self.obj = Dur(self.obj, stop)
+    #     return self
+
+    def dur(self, stop: float, start: float = 0) -> Self:
+        """Edits the playtime (every arg in sec.)"""
+        self.obj = Dur(self.obj, stop, start=start)
+        return self
+    
+    def apply() -> Self:
+        """Applies a musical modifier"""
+        pass
 
     def mul_func(self, factor_fun: Callable[[float], float]) -> Self:
         self.obj = MultiplyFunction(self.obj, factor_fun, sample_rate=self.sample_rate)

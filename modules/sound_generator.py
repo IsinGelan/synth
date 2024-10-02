@@ -7,7 +7,6 @@ from typing import Callable, Iterator
 from enum import IntEnum
 
 from .helpers import clamp
-from .track import to_mono_track
 
 SAMPLE_RATE = 48000
 
@@ -165,3 +164,13 @@ def jirj(fs: list[float], dur_s: float, *, vol: float = 1) -> Iterator[float]:
             f = next(f_it)
             phase %= 1
         yield y
+
+def sine_with_harmonics(fundamental: float, num_of_harmonics: int, vol_fun: Callable[[int], float], *, dur_s: float) -> Iterator[float]:
+    """num_of_harmonics: including the fundamental\n
+    vol_fun: volume for each harmonic (3rd harmonic would be `vol_fun(3)` in volume).
+    """
+
+    fs = [fundamental*i for i in range(1, num_of_harmonics+1)]
+    vols = [clamp(vol_fun(i), -1, 1) for i in range(1, num_of_harmonics+1)]
+
+    return multi_sine(fs, dur_s, vols=vols)

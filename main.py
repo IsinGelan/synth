@@ -1,16 +1,14 @@
 
-from math import pi, sin, tau
+from math import cos, pi, sin, tau
 
-from modules.helpers import forward_function, int_to_interval
+from modules.helpers import forward_function
 from modules.sound_generator import (
     Note,
     evolving_frequency,
     multi_sine,
     multi_wave,
     note_str_to_freqs,
-    note_to_freq,
-    silence,
-    triang
+    sine_with_harmonics,
 )
 from modules.sound_generator import (
     SAWTOOTH_WAVE,
@@ -21,7 +19,7 @@ from modules.track import MonoTrack, PolyTrack
 from modules.wav_rw import AudioData, read_wav_data, write_wav_data
 from modules.fun import display_amplitudes_img
 
-def main():
+def main_timely():
     fun = forward_function(
         [
             lambda x: x**0.5 * (1-x),
@@ -49,7 +47,7 @@ def main():
     new_audio = AudioData.from_track(upidupi_track)
     write_wav_data("neu_chilly.wav", new_audio)
 
-def main2():
+def main_progression():
     I = "c e g"
     V = "g h e4"
     iv = "a c e"
@@ -60,19 +58,11 @@ def main2():
         freqs = note_str_to_freqs(chord)
         chord_track = MonoTrack.from_iter(multi_sine(freqs, 2.5))
         chord_track.adsr(0.1, 0.7, 0.3, 0.5, hit_time=1.8)
-        chord_prog.add(MonoTrack.from_iter(silence(2.0 * i)).then(chord_track))
+        chord_prog.add(chord_track, offset_t=1.8*i)
     chord_prog.mul(0.7)
 
     audio = AudioData.from_track(chord_prog)
-    write_wav_data("chord.wav", audio)
-
-def main3():
-    # freqs = note_str_to_freqs("c e g")
-    # mono = MonoTrack.from_iter(jirj(freqs, 3.)).adsr(0.1, 0.7, 0.3, 0.7, hit_time=2.).mul(0.7)
-    mono = MonoTrack.from_iter(triang(note_to_freq(Note.C, 4), 4.0))
-    mono2 = MonoTrack.from_iter(triang(note_to_freq(Note.E, 4), 4.0))
-    audio = AudioData.from_track(mono.add(mono2).mul(0.3))
-    write_wav_data("jirj.wav", audio)
+    write_wav_data("generated/chord.wav", audio)
 
 def main_flute():
     # base = 2**(1/3)
@@ -85,12 +75,21 @@ def main_flute():
     mono = MonoTrack.from_iter(it).mul(0.5)
 
     audio = AudioData.from_track(mono)
-    write_wav_data("flute_try.wav", audio)
+    # audio.play()
+    audio.save("generated/flutn_try.wav")
 
 def main_test():
     wave = multi_wave(SAWTOOTH_WAVE, note_str_to_freqs("C E G"), 4.0)
     track = MonoTrack.from_iter(wave).mul(0.7)
     audio = AudioData.from_track(track)
     write_wav_data("test.wav", audio)
-    
-main_test()
+
+def main_harmonics():
+    num_of_harmonics = 40
+    vol_fun = lambda x: cos(x) * (1/x + 0.2)
+    wave = sine_with_harmonics(note_str_to_freqs("C")[0], num_of_harmonics, vol_fun, dur_s=4)
+    track = MonoTrack.from_iter(wave).mul(1/120)
+    audio = AudioData.from_track(track)
+    write_wav_data("generated/timbre.wav", audio)
+
+main_flute()

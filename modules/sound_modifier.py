@@ -1,7 +1,7 @@
 
 """Only works for PCM ints"""
 
-from math import sin, tau
+from abc import ABC
 from typing import Callable, Iterator
 
 IterMono = Iterator[float]
@@ -30,3 +30,15 @@ def shape_volume_mul(track: IterMono | IterPoly, t_volume_func: Callable[[float]
         t += dt
         yield tuple(channel*vol for channel in sample) if isinstance(sample, tuple) else sample*vol
 
+# ======================
+class Modifier(ABC):
+    pass
+
+class MPitch(Modifier):
+    pass
+
+class MVolume(Modifier):
+    pass
+
+class MTremolo(Modifier):
+    pass

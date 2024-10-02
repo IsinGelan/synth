@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from itertools import islice
 from typing import Self
 
+import pyaudio
+
 from .reader import Reader
 from .writer import Writer
 from .track import MonoTrack, PolyTrack
@@ -26,7 +28,7 @@ class AudioData:
         channels: int = 2,
         sample_rate: int = 48000,
         bit_p_sample: int = 16
-    ):
+    ) -> Self:
         byte_p_sample = ((bit_p_sample + 7) >> 3)
         byte_p_bloc = byte_p_sample * channels
         bloc_n = len(blocs)
@@ -39,10 +41,33 @@ class AudioData:
         )
     
     @classmethod
-    def from_track(cls, track: MonoTrack | PolyTrack, sample_rate: int = 48000):
+    def from_track(cls, track: MonoTrack | PolyTrack, sample_rate: int = 48000) -> Self:
         using_track = PolyTrack([track]) if isinstance(track, MonoTrack) else track
         blocs = using_track.to_audio_blocs()
         return cls.from_blocs(blocs, channels=using_track.n, sample_rate=sample_rate)
+    
+    def play(self):
+        """Plays the audio"""
+        bytestream = bytes().join(
+            samples_bloc_to_byte_bloc(samples, self.byte_p_sample, self.audio_fmt)
+            for samples in self.blocs
+        )
+
+        pya = pyaudio.PyAudio()
+        stream = pya.open(
+            format=pya.get_format_from_width(width=2),
+            channels=self.channels,
+            rate=self.sample_rate,
+            output=True
+        )
+        stream.write(bytestream)
+        stream.stop_stream()
+        stream.close()
+
+        pya.terminate()
+    
+    def save(self, filename: str):
+        write_wav_data(filename, self)
 
 
 def byte_bloc_to_samples_bloc(by_blo: bytes, channels: int, sample_width: int, audio_fmt: int) -> tuple:
@@ -54,7 +79,7 @@ def byte_bloc_to_samples_bloc(by_blo: bytes, channels: int, sample_width: int, a
     return tuple(int.from_bytes(sam, "little", signed=True) for sam in byte_samples)
 
 
-def samples_bloc_to_byte_bloc(samples_bloc: tuple, channels: int, sample_width: int, audio_fmt: int) -> bytes:
+def samples_bloc_to_byte_bloc(samples_bloc: tuple[int], sample_width: int, audio_fmt: int) -> bytes:
     """len(samples_bloc) == channels"""
     if audio_fmt != 1:
         raise NotImplementedError(
@@ -148,7 +173,6 @@ def write_wav_data(to_filename: str, data: AudioData):
         for samples_bloc in data.blocs:
             byte_bloc = samples_bloc_to_byte_bloc(
                 samples_bloc,
-                data.channels,
                 data.byte_p_sample,
                 data.audio_fmt
             )
