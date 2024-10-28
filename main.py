@@ -1,5 +1,5 @@
 
-from math import cos, pi, sin, tau
+from math import cos, log10, pi, sin, tau
 
 from modules.helpers import forward_function
 from modules.sound_generator import (
@@ -15,9 +15,9 @@ from modules.sound_generator import (
     SQUARE_WAVE,
     TRIANG_WAVE
 )
-from modules.track import MonoTrack, PolyTrack
+from modules.track import FrozenMonoTrack, MonoTrack, PolyTrack
 from modules.wav_rw import AudioData, read_wav_data, write_wav_data
-from modules.fun import display_amplitudes_img
+from modules.imager import display_amplitudes_img
 
 def main_timely():
     fun = forward_function(
@@ -44,7 +44,7 @@ def main_timely():
     freq_it = evolving_frequency(f_fun, 7.5)
     upidupi_track = MonoTrack.from_iter(freq_it).mul(0.8).mul_func(vfun)
 
-    new_audio = AudioData.from_track(upidupi_track)
+    new_audio = upidupi_track.to_audio()
     write_wav_data("neu_chilly.wav", new_audio)
 
 def main_progression():
@@ -56,12 +56,13 @@ def main_progression():
     chord_prog = MonoTrack()
     for i, chord in enumerate([I, V, iv, IV]):
         freqs = note_str_to_freqs(chord)
+        print(freqs)
         chord_track = MonoTrack.from_iter(multi_sine(freqs, 2.5))
         chord_track.adsr(0.1, 0.7, 0.3, 0.5, hit_time=1.8)
         chord_prog.add(chord_track, offset_t=1.8*i)
     chord_prog.mul(0.7)
 
-    audio = AudioData.from_track(chord_prog)
+    audio = chord_prog.to_audio()
     write_wav_data("generated/chord.wav", audio)
 
 def main_flute():
@@ -74,22 +75,49 @@ def main_flute():
     it = multi_sine(notes, 4.0, vols=vols)
     mono = MonoTrack.from_iter(it).mul(0.5)
 
-    audio = AudioData.from_track(mono)
+    audio = mono.to_audio()
     # audio.play()
     audio.save("generated/flutn_try.wav")
 
 def main_test():
     wave = multi_wave(SAWTOOTH_WAVE, note_str_to_freqs("C E G"), 4.0)
     track = MonoTrack.from_iter(wave).mul(0.7)
-    audio = AudioData.from_track(track)
+    audio = track.to_audio()
     write_wav_data("test.wav", audio)
 
 def main_harmonics():
-    num_of_harmonics = 40
+    num_of_harmonics = 8
     vol_fun = lambda x: cos(x) * (1/x + 0.2)
-    wave = sine_with_harmonics(note_str_to_freqs("C")[0], num_of_harmonics, vol_fun, dur_s=4)
-    track = MonoTrack.from_iter(wave).mul(1/120)
-    audio = AudioData.from_track(track)
-    write_wav_data("generated/timbre.wav", audio)
+    wave = sine_with_harmonics(note_str_to_freqs("C2")[0], num_of_harmonics, vol_fun, dur_s=4)
+    track = MonoTrack.from_iter(wave).mul(1/200)
+    audio = track.to_audio()
+    audio.play()
+    audio.save("generated/timbre.wav")
 
-main_flute()
+def main_harmonics2():
+    db_to_p = lambda db: 2**(db/10)
+    fundamental = 220
+
+    # OBOE
+    fs = [fundamental*i for i in range(1, 6)]
+    db_vols = [0, 12, 7, 17, -5]
+    vol_mul = 0.3
+    # PIANO (not good)
+    # fs = [fundamental*i for i in range(1, 9)]
+    # # db_vols = [0, -12, -9, -17, -23]
+    # vols = [0.226, 0.057, 0.077, 0.033, 0.015, 0.011, 0.007, 0.009]
+    # vol_mul = 0.9
+    # VIOLIN (not good)
+    # fs = [fundamental*i for i in range(1, 6, 1)]
+    # db_vols = [0, -5, -4, -12, -13]
+    # vol_mul = 0.4
+
+    # ---
+    vols = [db_to_p(v) for v in db_vols]
+    wave = multi_sine(fs, 2.0, vols=vols)
+    track = MonoTrack.from_iter(wave).mul(vol_mul)
+    audio = track.to_audio()
+    audio.play()
+    audio.save("generated/oboe.wav")
+
+main_progression()

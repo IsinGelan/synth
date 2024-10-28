@@ -3,17 +3,23 @@ from abc import ABC
 from dataclasses import dataclass
 from typing import Callable, Iterator, Self
 
+from modules.wav_rw import AudioData
+
 from .helpers import clamp, int_to_interval, interval_to_int
 
 # Wie yield in FUnktionen implementieren?
 
 class Track(ABC):
-    """Abstract base class for Tracks"""
+    """Abstract base class for Tracks:\n
+    A track is an iterator of samples."""
     def __init__(self, sample_rate: int = 48000) -> None:
         self.sample_rate = sample_rate
         self.dur = 0
 
     def __iter__(self):
+        ...
+    
+    def to_audio(self) -> AudioData:
         ...
 
 
@@ -213,9 +219,13 @@ class MonoTrack(Track):
         return cls.from_obj(FromList(lis), sample_rate)
     
     @classmethod
-    def from_audio_blocs(cls, int_blocs: list[tuple[int]], *, channel_index: int, sample_rate: int = 48000) -> Self:
+    def from_audio_blocs(cls, int_blocs: list[tuple[int]], *, channel_index: int = 0, sample_rate: int = 48000) -> Self:
         it = (int_to_interval(bloc[channel_index]) for bloc in int_blocs)
         return cls.from_iter(it, sample_rate)
+    
+    @classmethod
+    def from_audio_data(cls, audio_data: AudioData, *, channel_index: int = 0, sample_rate: int = 48000) -> Self:
+        return cls.from_audio_blocs(audio_data.blocs, channel_index=channel_index, sample_rate=sample_rate)
     
     # ==================
     def adsr(self, a: float, d: float, s: float, r: float, *, hit_time: float) -> Self:
@@ -295,6 +305,10 @@ class MonoTrack(Track):
     
     def __next__(self) -> float:
         return next(self._iterator)
+    
+    def to_audio(self) -> AudioData:
+        blocs = [(interval_to_int(sample),) for sample in self.obj]
+        return AudioData.from_blocs(blocs, channels=1, sample_rate=self.sample_rate)
 
 
 class FrozenMonoTrack(Track):
@@ -310,10 +324,38 @@ class FrozenMonoTrack(Track):
         # return cls.from_obj(FromIterator(iterator), sample_rate)
         pass
 
+    @classmethod
+    def from_iter(cls, iterator: Iterator[float], sample_rate: int = 48000) -> Self:
+        return cls(MonoTrack.from_obj(FromIterator(iterator), sample_rate))
+
+    @classmethod
+    def from_list(cls, lis: list[float], sample_rate: int = 48000) -> Self:
+        obj = cls(MonoTrack(), sample_rate)
+        obj.track = lis
+        obj.dur = len(obj.track) / obj.sample_rate
+        return obj
+
+    @classmethod
+    def from_audio_blocs(cls, int_blocs: list[tuple[int]], *, channel_index: int = 0, sample_rate: int = 48000) -> Self:
+        lis = [int_to_interval(bloc[channel_index]) for bloc in int_blocs]
+        return cls.from_list(lis, sample_rate)
+
+    @classmethod
+    def from_audio_data(cls, audio_data: AudioData, *, channel_index: int = 0, sample_rate: int = 48000) -> Self:
+        return cls.from_audio_blocs(audio_data.blocs, channel_index=channel_index, sample_rate=sample_rate)
+
+    # ==================
     def __iter__(self):
         return iter(self.track)
+    
+    def to_audio(self) -> AudioData:
+        blocs = [(interval_to_int(sample),) for sample in self.track]
+        return AudioData.from_blocs(blocs, channels=1, sample_rate=self.sample_rate)
 
-
+    # ==================
+    @property
+    def sample_n(self) -> int:
+        return len(self.track)
 
 # Decorator ============
 def to_mono_track(fun: Callable[..., Iterator[float]]) -> Callable[..., MonoTrack]:
@@ -359,4 +401,7 @@ class PolyTrack:
             tuple(interval_to_int(sample) for sample in poly_sample)
             for poly_sample in self.it_of_channels
         ]
+    
+    def to_audio(self) -> AudioData:
+        return AudioData.from_blocs(self.to_audio_blocs(), channels=self.n, sample_rate=self.sample_rate)
     

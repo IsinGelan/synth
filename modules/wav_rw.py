@@ -7,7 +7,6 @@ import pyaudio
 
 from .reader import Reader
 from .writer import Writer
-from .track import MonoTrack, PolyTrack
 
 
 @dataclass
@@ -41,10 +40,8 @@ class AudioData:
         )
     
     @classmethod
-    def from_track(cls, track: MonoTrack | PolyTrack, sample_rate: int = 48000) -> Self:
-        using_track = PolyTrack([track]) if isinstance(track, MonoTrack) else track
-        blocs = using_track.to_audio_blocs()
-        return cls.from_blocs(blocs, channels=using_track.n, sample_rate=sample_rate)
+    def from_file(cls, filename: str) -> Self:
+        return read_wav_data(filename)
     
     def play(self):
         """Plays the audio"""
@@ -89,7 +86,7 @@ def samples_bloc_to_byte_bloc(samples_bloc: tuple[int], sample_width: int, audio
     return bytes().join(byte_samples)
 
 
-def read_wav_data(from_filename: str):
+def read_wav_data(from_filename: str) -> AudioData:
     with Reader(from_filename) as reader:
         # Master RIFF Chunk
         file_type = reader.read_n_chars(4)

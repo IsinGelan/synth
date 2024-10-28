@@ -2,7 +2,7 @@
 """Only works for PCM ints"""
 
 from itertools import cycle
-from math import sin, tau
+from math import sin, tau, log2
 from typing import Callable, Iterator
 from enum import IntEnum
 
@@ -11,6 +11,7 @@ from .helpers import clamp
 SAMPLE_RATE = 48000
 
 # ======================
+# Note stuff
 class Note(IntEnum):
     C = 0
     Cis = 1
@@ -24,6 +25,8 @@ class Note(IntEnum):
     A = 9
     Ais = 10
     H = 11
+
+NOTE_REVERSE = list(Note)
 
 def note_to_freq(note: Note, octave: int, *, a4: float = 440) -> float:
     relative_to_a4: int = (octave - 4)*12 + note - Note.A
@@ -47,6 +50,14 @@ def note_str_to_freqs(note_str: str, *, a4: float = 440) -> list[float]:
     returns: the corresponding frequencies"""
     return [note_to_freq(*str_to_note(note), a4=a4) for note in note_str.split(" ")]
 
+def align_to_scale(freq: float, *, a4: float = 440) -> tuple[Note, int]:
+    a4_rel = log2(freq/a4)
+    octaves_over_a, rest = divmod(a4_rel, 1)
+    notes_over_a_in_octave = round(rest*12)
+    notes_over_a4 = 12 * octaves_over_a + notes_over_a_in_octave
+    notes_over_c4 = int(Note.A + notes_over_a4)
+    octave, note = divmod(notes_over_c4, 12)
+    return (NOTE_REVERSE[note], octave+4)
 
 # ======================
 # Phase functions: [0, 1) -> [-1, 1]
@@ -58,6 +69,7 @@ SQUARE_WAVE = lambda phase: -1 if phase < 0.5 else 1
 SAWTOOTH_WAVE = lambda phase: 2 * phase - 1
 
 # ======================
+# Sound Iterators
 def silence(dur_s: float) -> Iterator[float]:
     sample_n = int(SAMPLE_RATE * dur_s)
     for _ in range(sample_n):
@@ -111,7 +123,6 @@ def multi_wave(wave: FFFunc, fs: list[float], dur_s: float, *, vols: list[float]
         y = 1/volsum * sum(vol * wave(phase) for vol, phase in zip(vols, current_phases))
         current_phases = [(c + period) % 1 for c, period in zip(current_phases, periods)]
         yield y
-
 
 # @to_mono_track
 def multi_sine(fs: list[float], dur_s: float, *, vols: list[float] = ..., phases: list[float] = ...) -> Iterator[float]:

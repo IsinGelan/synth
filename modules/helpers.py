@@ -22,6 +22,30 @@ def int_to_interval(x: int) -> float:
     assert -1 <= ret <= 1
     return ret
 
+def min_and_max(values: list[float]) -> tuple[float, float]:
+    valit = iter(values)
+    mi = ma = next(valit)
+    for val in valit:
+        if val < mi:
+            mi = val
+            continue
+        if val > ma:
+            ma = val
+    return mi, ma
+
+def rescale_values(
+        values: list[float], *,
+        hi: float, lo: float = 0,
+        source_hi: float | None = None, source_lo : float | None = 0
+    ) -> list[float]:
+    # lowest and highest point in the data
+    scan_lo, scan_hi = min_and_max(values)
+    # lowest and highest point in the domain
+    real_lo = scan_lo if source_lo is None else source_lo
+    real_hi = scan_hi if source_hi is None else source_hi
+
+    factor = (hi - lo) / (real_hi - real_lo)
+    return [(val - real_lo) * factor + lo for val in values]
 
 FFFunc = Callable[[float], float]
 

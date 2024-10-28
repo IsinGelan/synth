@@ -12,6 +12,9 @@ def every_n(it: Iterator, n: int) -> Iterator:
             continue
         yield el
 
+def mirror(x, y, h) -> tuple[int, int, int]:
+    return (x, h-y)
+
 def display_amplitudes_img(audio_data: AudioData):
     chosing_n = 6000
     chosing_rate = audio_data.bloc_n//chosing_n
@@ -38,3 +41,32 @@ def display_amplitudes_img(audio_data: AudioData):
             img.putpixel((i, 2*height+offset+y), 1)
 
     img.show()
+
+def display_fft_res(fft_res: list[complex]):
+    w, h = 500, 300
+    baseline = 20
+    topline = h-20
+    leftline = 50
+    rightline = w - 50
+
+    innerw, innerh = rightline-leftline, topline-baseline
+
+    top_val = 500
+    start, stop = 150, 500
+
+    reslen = len(fft_res)
+    choosing_rate = max((stop-start) // innerw, 1)
+    it = islice(every_n(fft_res, choosing_rate), start, min(stop, innerw+start))
+
+    img = Image.new("1", (w, h))
+
+    for i, val in enumerate(it):
+        val: complex
+        for y in range(int(innerh*val.real/top_val)):
+            img.putpixel(mirror(leftline+i, baseline+y, h), 1)
+        
+        img.putpixel(mirror(leftline+i, baseline-5, h), 1)
+    
+    img.show()
+
+    
