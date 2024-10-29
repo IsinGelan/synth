@@ -4,10 +4,11 @@ from typing import Iterator
 from scipy.fft import fft
 from scipy.signal.windows import blackman
 
-from .track import FrozenMonoTrack
+from .helpers import windowed
+from .track import FrozenMonoTrack, MonoTrack
 
 
-def fft_full(snippet: FrozenMonoTrack):
+def fft_full(snippet: FrozenMonoTrack) -> list[float]:
     """FFT on the snippet (from 0 to 24000 Hz)\n
     freq.res = `1/dur Hz` (where dur is the duration of the snippet, assuming SR of 24000) \n
     iow. generates 1 data point for every data point in the snippet\n
@@ -16,18 +17,18 @@ def fft_full(snippet: FrozenMonoTrack):
     print(snippet.dur, len(res))
     return res[:len(res)//2]
 
-def fft_window(snippet: FrozenMonoTrack):
-    fft
-
-def windowed(it: Iterator[float], size: int) -> Iterator[list[float]]:
-    """like a sliding window over the iterator"""
-    win = list(islice(it, size))
-    yield win
-
-    for elem in it:
-        win.pop(0)
-        win.append(elem)
-        yield win
+def fft_shorttime(
+        track: MonoTrack | FrozenMonoTrack, *,
+        times_per_sec: float,
+        freq_resolution: float
+    ) -> Iterator[list[float]]:
+    """freq_resolution: difference between frequencies in neighboring entries\n
+    times_per_sec: how many times per second to perform an FFT"""
+    dur = 1/freq_resolution * 24000/track.sample_rate
+    window_size = int(dur * track.sample_rate)
+    window_step = int(track.sample_rate/times_per_sec)
+    print(f"{window_size=} {window_step=}")
+    return (fft(win, window_size) for win in windowed(iter(track), window_size, window_step))
 
 def peak_iter(lis: list[float], *, lo_threshold: float) -> Iterator:
     """returns the peaks (the index where they were found, their height) if they are higher than lo_threshold"""

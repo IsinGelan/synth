@@ -2,7 +2,9 @@
 from itertools import islice
 from typing import Iterator
 
-from PIL import Image
+from PIL import Image, ImageDraw
+
+from modules.helpers import clamp, windowed
 
 from .wav_rw import AudioData
 
@@ -42,8 +44,8 @@ def display_amplitudes_img(audio_data: AudioData):
 
     img.show()
 
-def display_fft_res(fft_res: list[complex]):
-    w, h = 500, 300
+def display_fft_res(fft_res: list[complex], *, wh=(500, 300)):
+    w, h = wh
     baseline = 20
     topline = h-20
     leftline = 50
@@ -66,7 +68,67 @@ def display_fft_res(fft_res: list[complex]):
             img.putpixel(mirror(leftline+i, baseline+y, h), 1)
         
         img.putpixel(mirror(leftline+i, baseline-5, h), 1)
+
+    img.show()
+
+def stepped_range(start: float, stop: float, step: float) -> Iterator[int]:
+    """yields integers"""
+    val: float = start
+    while val< stop:
+        yield int(val)
+        val += step
+
+def spectrum_column(
+        freq_vol: list[tuple[float, float]],
+        output_length: int, *,
+        freq_lo: float, freq_hi: float,
+        spread_width: float = 5
+    ) -> list[float]:
+    """spread_width: the delta freq up and down covered by the halo of a frequency\n
+    assuming vol data between 0 and 1, but still works fine if not the case"""
+    step = (freq_hi - freq_lo) / output_length
+    freq_domain = stepped_range(freq_lo, freq_hi, step)
+    freqs, vols = zip(*freq_vol)
+    freqs_aligned = [int((freq-freq_lo)//step) for freq in freqs]
+    spread_steps = int(spread_width / step)
     
+    out = [0] * output_length
+    for freq_i, vol in zip(freqs_aligned, vols):
+        starthalo   = clamp(freq_i - spread_steps, 0, output_length)
+        stophalo    = clamp(freq_i + spread_steps, 0, output_length)
+        for j in range(starthalo, stophalo):
+            dist = abs(j-freq_i) + 1
+            val = vol/dist
+            out[j] += val
+
+    return out
+
+FFT_ITER = Iterator[list[tuple[float, float]]]
+
+def display_stft(fft_t: FFT_ITER, sample_n: int, wh=(500, 300)):
+    """length: number of values to display"""
+    w, h = wh
+    baseline = 20
+    topline = h-20
+    leftline = 50
+    rightline = w - 50
+    innerw, innerh = rightline-leftline, topline-baseline
+
+    img = Image.new("L", (w, h))
+    drawer = ImageDraw.Draw(img)
+
+    valit = islice(fft_t, sample_n)
+
+    delta_x = innerw / sample_n
+    xit = windowed(stepped_range(0, innerw, delta_x), size=2)
+
+    for val_lis, (x_start, x_end) in zip(valit, xit):
+        col = spectrum_column(val_lis, innerh, freq_lo=0, freq_hi=1000, spread_width=10)
+        for i, val in enumerate(col, start=baseline):
+            val = clamp(val, 0, 1)
+            shape = [(leftline + x_start, i), (leftline+x_end-1, i+1)]
+            drawer.rectangle(shape, int(val*255))
+            
     img.show()
 
     

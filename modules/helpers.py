@@ -1,5 +1,6 @@
 
-from typing import Callable
+from itertools import islice
+from typing import Callable, Iterator
 
 
 def clamp(x: int, a: int, b: int) -> int:
@@ -46,6 +47,48 @@ def rescale_values(
 
     factor = (hi - lo) / (real_hi - real_lo)
     return [(val - real_lo) * factor + lo for val in values]
+
+def iter_skip(it: Iterator, skip_n: int) -> int:
+    """returns the actual number of skipped elements"""
+    if skip_n == 0:
+        return 0
+    i = 0
+    for _ in it:
+        i+= 1
+        if i == skip_n:
+            return skip_n
+    return i
+
+def windowed(it: Iterator[float], size: int, step: int = 1) -> Iterator[list[float]]:
+    """like a sliding window over the iterator\n
+    size: size of the window\n
+    step: number of elements between starts of windows"""
+
+    modus_step_pop = step >= size # Step mode if True, else Pop mode
+    popnum = min(step, size)
+    jumpnum = max(0, step-size)
+    print(f"{popnum=} {jumpnum=}")
+
+    # MODES:
+    # Step Mode: reset win, win = islice(it, size), size assertion, yield
+    # Pop Mode:  Pop (popnum) and append (popnum) new elements, then yield
+
+    win = list(islice(it, size))
+    if len(win) != size:
+        return
+
+    while True:
+        yield win
+        # cut off the front: only leaves elements in win if step < size
+        win = win[popnum:]
+        # skip elements between windows (if step >= size)
+        skipped = iter_skip(it, jumpnum)
+        if skipped != jumpnum: return
+        # append new elements
+        new_win_end = list(islice(it, popnum))
+        # print()
+        if len(new_win_end) != popnum: return
+        win += new_win_end
 
 FFFunc = Callable[[float], float]
 
